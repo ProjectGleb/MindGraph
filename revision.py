@@ -1,19 +1,18 @@
-###CONDA ENVIRONMENT: conda activate monthly_revision
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import os
 
-
-# --- A SIMILAR CHART WITH A DIFFERNT CONSTANT IS ALSO NEEDED FOR WEEKLY REVIEW. ---
-
+# --- A SIMILAR CHART WITH A DIFFERENT CONSTANT IS ALSO NEEDED FOR WEEKLY REVIEW. ---
 
 # Upload a list of topics √
 # Use MCTS algorithm (Importance Index is incorrect!!!)
 # Plot the topics forgetfulness curve
-# Develop a quiz for each topic. Append it to the end of the file. 
+# Develop a quiz for each topic. Append it to the end of the file.
 # Develop interconnection quiz. To force me to RECALL OLD TOPICS I'VE COVERED THAT MIGHT BE RELATED. (TAG THEM ON OBSEDIAN)?
 
-path = "/Users/gleb/Desktop/Obsedian/My Obsidian Brain/Learning & Development/monthly_review.md"
+path = "/Users/gleb/Desktop/Obsedian/My Obsidian Brain/Learning & Development/Monthly Review/monthly_review.md"
+image_path = "/Users/gleb/Desktop/Obsedian/My Obsidian Brain/pics/"
 
 ### --- READING & WRITING THE FILE LOGIC  --- ### √
 
@@ -46,92 +45,95 @@ def headings_and_subheadings(topics):
 
     return headings
 
-# Replace 'path' with the actual path to your file
-import math  # Import the math module
-
 topics = read_topics(path)
 headings_dict = headings_and_subheadings(topics)
 
-# Print the results
+subjects = []
+
 for heading, subheadings in headings_dict.items():
-    print(f"{heading}:")
     for subheading, data in subheadings.items():
-        print(f"  - {subheading}: {data}")
-
-
-
-## --- MCTS  --- ### √
-# Importance needs adding to the equation I: out of 10
-
-#{IU': 10, 'D': 1, 'n': 10, 'c': 10, 'C': 10, 't': 2}
-
-# def mcts(headings_dict): ### To be used instead of the parameters bellow
-
-
-### --- 3. PLOTTING THE FORGETFULNESS CURVE LOGIC  --- ### √
-import numpy as np
-import matplotlib.pyplot as plt
-
-# List of subjects with their respective parameters
-subjects = [
-    {'name': 'Subject 1', 'I':10, 'IU': 10, 'D': 1, 'N': 10000000, 'c': 10, 'C': 10, 't': 1},  # Assuming subject 1 was visited 2 months ago
-    {'name': 'Subject 2', 'I':10, 'IU': 7, 'D': 2, 'N': 0, 'c': 7, 'C': 10, 't': 1},      
-    {'name': 'Subject 3', 'I':2, 'IU': 5, 'D': 3, 'N': 0, 'c': 5, 'C': 10, 't': 1},      
-    # Add more subjects as needed
-]
+        topic = {
+            'heading': heading,
+            'subheading': subheading,
+            'I': int(data.get('I', 1)),
+            'IU': int(data.get('IU', 1)),
+            'D': int(data.get('D', 1)),
+            'N': int(data.get('N', 1)),
+            'C': int(data.get('C', 1)),
+            't': int(data.get('t', 1))
+        }
+        subjects.append(topic)
 
 # Time range (e.g., 0 to 12 months)
 t = np.linspace(0, 12, 400)
 
-plt.figure(figsize=(10, 6))
+# Turn on interactive mode
+plt.ion()
 
-for subject in subjects:
-    IU = subject['IU']
-    D = subject['D']
-    N = subject['N'] # Number of times the subject was visited should inverse the importance of the revisit!!!
-    c = subject['c']
-    C = subject['C']
-    I = subject['I']
-    elapsed_time = subject['t']  # Time elapsed since subject was last visited
+# Open the .md file for appending
+with open(path, 'a') as md_file:
+    image_index = 1  # Initialize image index
 
-    # Normalize the values
-    IU_prime = (IU * 0.25) / 10
-    D_prime = (1 / (D * 0.4)) / 10
-    N_prime = (N * 0.25) / 10
-    C_prime = (C * 0.25) / 10
-    I_prime = I
+    # Create a figure for each header
+    for heading in headings_dict.keys():
+        fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Initial understanding as a percentage
-    initial_understanding = (IU / 10) * 100
+        for subject in subjects:
+            if subject['heading'] == heading:
+                IU = subject['IU']
+                D = subject['D']
+                N = subject['N']
+                C = subject['C']
+                I = subject['I']
+                elapsed_time = subject['t']
 
-    # Calculate retention using the modified formula
-    Understanding = initial_understanding * np.exp(-t / (IU_prime * D_prime * C_prime * c * C)) ###
+                # Normalize the values
+                IU_prime = (IU * 0.25) / 10
+                D_prime = (1 / (D * 0.4)) / 40
+                N_prime = 1 / (N * 0.25)
+                C_prime = (C * 0.25) / 10
+                I_prime = I
+                c = 10
 
-    # Gets the Y value Current Understanding (CU) based on elapsed time x (shown in the plot). i.e: shows where the point is on the plot
-    #returns it in %
-    idx = np.abs(t - elapsed_time).argmin()
-    current_understanding = Understanding[idx]
-    importance_index = current_understanding * I
-    print(f"Importance index for {subject['name']}: {importance_index}")
+                # Initial understanding as a percentage
+                initial_understanding = (IU / 10) * 100
 
-    # Plotting each subject's understanding curve
-    plt.plot(t, Understanding, label=subject['name'], linewidth=2.5)
+                # Calculate retention using the modified formula
+                Understanding = initial_understanding * np.exp((-t / (IU_prime * D_prime * C_prime * 2)) * (1 / (N_prime * 30)) * (1 / c))
 
-    # Plotting Current Understanding (CU) as a point on the curve
-    plt.scatter(elapsed_time, current_understanding, s=100, label=f'{subject["name"]} CU', zorder=5)
+                # Find the index corresponding to the elapsed time
+                idx = np.abs(t - elapsed_time).argmin()
+                current_understanding = Understanding[idx]
 
-    # Print Current Understanding (CU) for each subject
-    # print(f"Current Understanding for {subject['name']}: {current_understanding}")
+                importance_index = current_understanding * I
+                print(f"Importance index for {subject['subheading']}: {importance_index}")
 
-    # Importance = I_prime + IU_prime + N_prime + C_prime
-    # print(Importance)
+                # Plotting each subject's understanding curve
+                ax.plot(t, Understanding, label=subject['subheading'], linewidth=1.5)
 
-# Plot settings
-plt.xlabel('Time (months)')
-plt.ylabel('Understanding (%)')
-plt.title('Forgetfulness Curve for Multiple Subjects')
-plt.legend()
-plt.grid(True)
-plt.show()
+                # Plotting Current Understanding (CU) as a point on the curve
+                ax.scatter(elapsed_time, current_understanding, s=100, label=f'{subject["subheading"]} CU', zorder=5)
 
-#ho
+        # Plot settings
+        ax.set_xlabel('Time (months)')
+        ax.set_ylabel('Understanding (%)')
+        ax.set_title(f'Retention Curve For {heading}')
+        ax.legend()
+        ax.grid(True)
+
+        # Save the figure to the 'pics' directory with an index
+        figure_filename = f"{heading.replace(' ', '_')}_{image_index}.png"
+        figure_path = os.path.join(image_path, figure_filename)
+        plt.savefig(figure_path, dpi=300, bbox_inches='tight')
+
+        # Append the image path to the .md file using the ![[image_path]] format
+        md_file.write(f'\n\n![[{figure_filename}]]\n')
+
+        # Increment the image index
+        image_index += 1
+
+        # Display the plot (non-blocking)
+        plt.pause(0.001)
+
+# Keep the script running until all plots are displayed
+plt.show(block=True)
