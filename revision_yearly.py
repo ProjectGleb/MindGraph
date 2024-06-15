@@ -2,46 +2,49 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import os
+from quiz_agent import quiz
+import datetime
 
-# --- A SIMILAR CHART WITH A DIFFERENT CONSTANT IS ALSO NEEDED FOR WEEKLY REVIEW. ---
-
-# Upload a list of topics √
-# Use MCTS algorithm (Importance Index is incorrect!!!)
-# Plot the topics forgetfulness curve
-# Develop a quiz for each topic. Append it to the end of the file.
-# Develop interconnection quiz. To force me to RECALL OLD TOPICS I'VE COVERED THAT MIGHT BE RELATED. (TAG THEM ON OBSEDIAN)?
 
 path = "/Users/gleb/Desktop/Obsedian/My Obsidian Brain/Learning & Development/Monthly Review/monthly_review.md"
 image_path = "/Users/gleb/Desktop/Obsedian/My Obsidian Brain/pics/"
-
-### --- READING & WRITING THE FILE LOGIC  --- ### √
 
 def read_topics(path):
     with open(path, 'r') as file:
         topics = file.read().splitlines()
         return topics
+    
+def calculate_elapsed_months(date_str):
+    date_format = "%d/%m/%Y"
+    given_date = datetime.datetime.strptime(date_str, date_format)
+    today = datetime.datetime.now()
+    diff = abs((today.year - given_date.year) * 12 + (today.month - given_date.month))
+    return diff
 
 def headings_and_subheadings(topics):
     headings = {}
     current_heading = None
 
     for line in topics:
-        if line.startswith('- '):
-            current_heading = line[2:].strip()
+        if line.startswith('# Monthly'):
+            current_heading = 'Monthly'
             headings[current_heading] = {}
-        elif line.startswith('\t- ') and current_heading:
-            parts = line[3:].strip().split('{')  # Split subheading and data
-            if len(parts) == 2:  # Ensure both parts are present
+        elif line.startswith('\t- ') and current_heading == 'Monthly':
+            parts = line[3:].strip().split('{')
+            if len(parts) == 2:
                 subheading = parts[0].strip()
-                data = parts[1].rstrip('}')  # Remove closing brace
+                data = parts[1].rstrip('}')
                 data_dict = {}
                 for item in data.split(','):
-                    key_value = item.strip().split(':')  # Split key-value pairs
-                    if len(key_value) == 2:  # Ensure key-value pair is valid
+                    key_value = item.strip().split(':')
+                    if len(key_value) == 2:
                         key = key_value[0].strip()
                         value = key_value[1].strip()
                         data_dict[key] = value
-                headings[current_heading][subheading] = data_dict
+                elapsed_months = calculate_elapsed_months(data_dict['t'])
+                if 1 <= elapsed_months <= 2:
+                    data_dict['t'] = elapsed_months
+                    headings[current_heading][subheading] = data_dict
 
     return headings
 
@@ -60,23 +63,20 @@ for heading, subheadings in headings_dict.items():
             'D': int(data.get('D', 1)),
             'N': int(data.get('N', 1)),
             'C': int(data.get('C', 1)),
-            't': int(data.get('t', 1))
+            't': int(data.get('t', 0.1))
         }
         subjects.append(topic)
 
-# Time range (e.g., 0 to 12 months)
 t = np.linspace(0, 12, 400)
 
-# Turn on interactive mode
 plt.ion()
 
-# Open the .md file for appending
 with open(path, 'a') as md_file:
-    image_index = 1  # Initialize image index
+    image_index = 1
 
-    # Create a figure for each header
     for heading in headings_dict.keys():
         fig, ax = plt.subplots(figsize=(10, 6))
+        print(heading)
 
         for subject in subjects:
             if subject['heading'] == heading:
@@ -86,8 +86,8 @@ with open(path, 'a') as md_file:
                 C = subject['C']
                 I = subject['I']
                 elapsed_time = subject['t']
+                print(f'elapsed time is:{elapsed_time}')
 
-                # Normalize the values
                 IU_prime = (IU * 0.25) / 10
                 D_prime = (1 / (D * 0.4)) / 40
                 N_prime = 1 / (N * 0.25)
@@ -95,45 +95,39 @@ with open(path, 'a') as md_file:
                 I_prime = I
                 c = 10
 
-                # Initial understanding as a percentage
                 initial_understanding = (IU / 10) * 100
 
-                # Calculate retention using the modified formula
                 Understanding = initial_understanding * np.exp((-t / (IU_prime * D_prime * C_prime * 2)) * (1 / (N_prime * 30)) * (1 / c))
 
-                # Find the index corresponding to the elapsed time
                 idx = np.abs(t - elapsed_time).argmin()
                 current_understanding = Understanding[idx]
 
                 importance_index = current_understanding * I
                 print(f"Importance index for {subject['subheading']}: {importance_index}")
 
-                # Plotting each subject's understanding curve
                 ax.plot(t, Understanding, label=subject['subheading'], linewidth=1.5)
-
-                # Plotting Current Understanding (CU) as a point on the curve
                 ax.scatter(elapsed_time, current_understanding, s=100, label=f'{subject["subheading"]} CU', zorder=5)
 
-        # Plot settings
+                quiz_response = quiz(heading, subject['subheading'], importance_index)
+                md_file.write(f"\n\n## {subject['subheading']}\n")
+                md_file.write(quiz_response)
+
+            else:pass
+
         ax.set_xlabel('Time (months)')
         ax.set_ylabel('Understanding (%)')
         ax.set_title(f'Retention Curve For {heading}')
         ax.legend()
         ax.grid(True)
 
-        # Save the figure to the 'pics' directory with an index
         figure_filename = f"{heading.replace(' ', '_')}_{image_index}.png"
         figure_path = os.path.join(image_path, figure_filename)
         plt.savefig(figure_path, dpi=300, bbox_inches='tight')
 
-        # Append the image path to the .md file using the ![[image_path]] format
         md_file.write(f'\n\n![[{figure_filename}]]\n')
 
-        # Increment the image index
         image_index += 1
 
-        # Display the plot (non-blocking)
         plt.pause(0.001)
 
-# Keep the script running until all plots are displayed
 plt.show(block=True)
